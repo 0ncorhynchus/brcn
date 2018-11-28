@@ -14,13 +14,13 @@ blur_size = 2
 scale = 2
 
 def generate_low_resolution(image):
+    (height, width) = image.shape
     blur = cv2.GaussianBlur(image, (5, 5), blur_size)
-    size = (blur.shape[1], blur.shape[0])
-    small_size = (size[0] // scale, size[1] // scale)
-    small = cv2.resize(blur, small_size, interpolation = cv2.INTER_CUBIC)
-    low_reso = cv2.resize(small, size, interpolation = cv2.INTER_CUBIC)
-    return low_reso
+    small = cv2.resize(blur, (width//scale, height//scale), interpolation = cv2.INTER_CUBIC)
+    return cv2.resize(small, (width, height), interpolation = cv2.INTER_CUBIC)
 
+def extract(movie, n, i, j):
+    return movie[n:n+temporal_size, i:i+spatial_size, j:j+spatial_size]
 
 def main(filename):
     reader = YV12Reader(video_size, filename)
@@ -37,20 +37,13 @@ def main(filename):
 
     print('Writing training data to "{}".'.format(outfile))
 
+    (height, width) = video_size
     with tf.python_io.TFRecordWriter(outfile) as writer:
         for seq in range(0, num_frames-temporal_size+1, temporal_stride):
-            for i in range(0, video_size[0]-spatial_size+1, spatial_stride):
-                for j in range(0, video_size[1]-spatial_size+1, spatial_stride):
-                    hr_sample = high_reso_frames[
-                        seq:seq+temporal_size,
-                        j:j+spatial_size,
-                        i:i+spatial_size
-                    ]
-                    lr_sample = low_reso_frames[
-                        seq:seq+temporal_size,
-                        j:j+spatial_size,
-                        i:i+spatial_size
-                    ]
+            for i in range(0, width-spatial_size+1, spatial_stride):
+                for j in range(0, height-spatial_size+1, spatial_stride):
+                    hr_sample = extract(high_reso_frames, seq, i, j)
+                    lr_sample = extract(low_reso_frames, seq, i, j)
                     writer.write(encode(lr_sample, hr_sample).SerializeToString());
 
 

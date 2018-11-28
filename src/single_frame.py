@@ -17,11 +17,11 @@ options = [
     (1,  5)
 ]
 
-def reshape(image):
-    return tf.reshape(image, (44, 44, -1))
-
 def take_a_snapshot(image):
-    return image[:1]
+    return image[0]
+
+def add_channel(image):
+    return tf.reshape(image, (44, 44, 1))
 
 def duplicate(fn):
     return lambda x, y: (fn(x), fn(y))
@@ -45,7 +45,7 @@ filename_list = list(map(str, Path('./data').glob('*.tfrecord')))
 dataset = tf.data.TFRecordDataset(filename_list)
 dataset = dataset.map(decode)
 dataset = dataset.map(duplicate(take_a_snapshot))
-dataset = dataset.map(duplicate(reshape))
+dataset = dataset.map(duplicate(add_channel))
 dataset = dataset.map(duplicate(normalize))
 
 dataset = dataset.shuffle(buffer_size=10000)
