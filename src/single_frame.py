@@ -1,6 +1,7 @@
 from example import *
 from model import BRCNModel
 from pathlib import Path
+import os
 import tensorflow as tf
 
 tf.enable_eager_execution()
@@ -28,21 +29,22 @@ dataset = dataset.batch(64)
 model = BRCNModel()
 optimizer = tf.train.AdamOptimizer()
 
-loss_history = []
+checkpoint_dir = './model'
+os.makedirs(checkpoint_dir, exist_ok=True)
+checkpoint_prefix = os.path.join(checkpoint_dir, 'ckpt')
+root = tf.train.Checkpoint(optimizer=optimizer,
+                           model=model,
+                           optimizer_step=tf.train.get_or_create_global_step())
+
 
 for (batch, (low_reso, high_reso)) in enumerate(dataset):
-    if batch % 80 == 0:
-        print()
-    print('.', end='')
     with tf.GradientTape() as tape:
         result = model(low_reso)
         loss_value = tf.reduce_mean((high_reso - result) ** 2)
 
-    loss_history.append(loss_value.numpy())
     grads = tape.gradient(loss_value, model.variables)
     optimizer.apply_gradients(zip(grads, model.variables),
             global_step=tf.train.get_or_create_global_step())
 
-
-for loss in loss_history:
-    print('{}'.format(loss))
+root.save(checkpoint_prefix)
+# root.restor(tf.train.latest_checkpoint(checkpoint_dir))
