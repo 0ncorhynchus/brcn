@@ -24,27 +24,32 @@ dataset = dataset.map(duplicate(normalize))
 
 dataset = dataset.shuffle(buffer_size=10000)
 dataset = dataset.batch(64)
-# dataset = dataset.repeat(10)
+dataset = dataset.repeat(10)
 
 model = BRCNModel()
 optimizer = tf.train.AdamOptimizer()
+global_step = tf.train.get_or_create_global_step()
 
 checkpoint_dir = './model'
 os.makedirs(checkpoint_dir, exist_ok=True)
 checkpoint_prefix = os.path.join(checkpoint_dir, 'ckpt')
 root = tf.train.Checkpoint(optimizer=optimizer,
                            model=model,
-                           optimizer_step=tf.train.get_or_create_global_step())
+                           optimizer_step=global_step)
 
+logdir = "./tb/"
+writer = tf.contrib.summary.create_file_writer(logdir)
 
-for (batch, (low_reso, high_reso)) in enumerate(dataset):
-    with tf.GradientTape() as tape:
-        result = model(low_reso)
-        loss_value = tf.reduce_mean((high_reso - result) ** 2)
+with writer.as_default(), tf.contrib.summary.always_record_summaries():
+    for (batch, (low_reso, high_reso)) in enumerate(dataset):
+        with tf.GradientTape() as tape:
+            result = model(low_reso)
+            loss_value = tf.reduce_mean((high_reso - result) ** 2)
 
-    grads = tape.gradient(loss_value, model.variables)
-    optimizer.apply_gradients(zip(grads, model.variables),
-            global_step=tf.train.get_or_create_global_step())
+        tf.contrib.summary.scalar('loss', loss_value)
+        grads = tape.gradient(loss_value, model.variables)
+        optimizer.apply_gradients(zip(grads, model.variables),
+                                  global_step=global_step)
 
 root.save(checkpoint_prefix)
-# root.restor(tf.train.latest_checkpoint(checkpoint_dir))
+# root.restore(tf.train.latest_checkpoint(checkpoint_dir))
